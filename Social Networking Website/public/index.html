@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TweetSpace - Social Network</title>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    
+    <!-- ===== LOGIN VIEW ===== -->
+    <div id="loginView" class="view auth-container hidden">
+        <div class="auth-box">
+            <div class="auth-logo">
+                <i class="fas fa-comments"></i>
+            </div>
+            <h2>Sign in to TweetSpace</h2>
+            <div id="loginAlert" class="alert alert-danger hidden"></div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginUsername">Username</label>
+                    <input type="text" id="loginUsername" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" class="form-control" required>
+                </div>
+                <button type="submit" class="btn-primary">Sign in</button>
+            </form>
+            <div class="auth-switch">
+                Don't have an account? <a id="showRegister">Sign up</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== REGISTER VIEW ===== -->
+    <div id="registerView" class="view auth-container hidden">
+        <div class="auth-box">
+            <div class="auth-logo">
+                <i class="fas fa-comments"></i>
+            </div>
+            <h2>Create your account</h2>
+            <div id="registerAlert" class="alert alert-danger hidden"></div>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="registerUsername">Username</label>
+                    <input type="text" id="registerUsername" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerEmail">Email</label>
+                    <input type="email" id="registerEmail" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Password</label>
+                    <input type="password" id="registerPassword" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerBio">Bio (optional)</label>
+                    <input type="text" id="registerBio" class="form-control" placeholder="Tell us about yourself">
+                </div>
+                <button type="submit" class="btn-primary">Sign up</button>
+            </form>
+            <div class="auth-switch">
+                Already have an account? <a id="showLogin">Sign in</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MAIN APP VIEW ===== -->
+    <div id="appView" class="view hidden">
+        <!-- ===== TOP NAVIGATION BAR ===== -->
+        <nav class="top-nav">
+            <div class="nav-brand">
+                <i class="fas fa-comments"></i>
+                <span>TweetSpace</span>
+            </div>
+            
+            <ul class="nav-menu">
+                <li>
+                    <a class="nav-link" data-view="home">
+                        <i class="fas fa-home"></i>
+                        <span>Home</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link" data-view="explore">
+                        <i class="fas fa-compass"></i>
+                        <span>Explore</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link" data-view="profile">
+                        <i class="fas fa-user"></i>
+                        <span>Profile</span>
+                    </a>
+                </li>
+            </ul>
+            
+            <div class="user-info">
+                <div class="user-avatar" id="currentUserAvatar">U</div>
+                <div class="user-details">
+                    <h4 id="currentUserName">User</h4>
+                    <p id="currentUserUsername">@username</p>
+                </div>
+                <button id="logoutBtn" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </nav>
+        
+        <div class="app-container">
+            
+            <!-- ===== MAIN CONTENT ===== -->
+            <main class="main-content">
+                
+                <!-- HOME FEED VIEW -->
+                <div id="homeView" class="view hidden">
+                    <div class="content-header">
+                        <h2>Home</h2>
+                    </div>
+                    
+                    <!-- Tweet Composer -->
+                    <div class="tweet-composer">
+                        <div class="composer-content">
+                            <div class="composer-avatar" id="composerAvatar">U</div>
+                            <div class="composer-form">
+                                <textarea 
+                                    id="tweetText" 
+                                    class="tweet-input" 
+                                    placeholder="What's happening?"
+                                    rows="3"
+                                ></textarea>
+                                <div id="imagePreview" class="image-preview hidden"></div>
+                                <div class="composer-actions">
+                                    <div class="composer-icons">
+                                        <button type="button" class="icon-btn" id="imageUploadBtn" title="Add image">
+                                            <i class="far fa-image"></i>
+                                        </button>
+                                        <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                                    </div>
+                                    <button id="postTweetBtn" class="post-btn" disabled>Tweet</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Feed -->
+                    <div id="feedContainer">
+                        <div class="loading">Loading your feed...</div>
+                    </div>
+                </div>
+
+                <!-- EXPLORE VIEW -->
+                <div id="exploreView" class="view hidden">
+                    <div class="content-header">
+                        <h2>Explore</h2>
+                    </div>
+                    
+                    <!-- Search -->
+                    <div class="search-container">
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            class="search-input" 
+                            placeholder="Search users..."
+                        >
+                    </div>
+                    
+                    <!-- Users List -->
+                    <div id="usersContainer">
+                        <div class="loading">Loading users...</div>
+                    </div>
+                </div>
+
+                <!-- PROFILE VIEW -->
+                <div id="profileView" class="view hidden">
+                    <div class="content-header">
+                        <h2>Profile</h2>
+                    </div>
+                    
+                    <!-- Profile Header -->
+                    <div class="profile-header">
+                        <div class="profile-banner"></div>
+                        <div class="profile-info">
+                            <div class="profile-avatar-large" id="profileAvatar">U</div>
+                            <div class="profile-name" id="profileName">Username</div>
+                            <div class="profile-username" id="profileUsername">@username</div>
+                            <div class="profile-bio" id="profileBio">No bio yet</div>
+                            <div class="profile-stats">
+                                <div>
+                                    <span id="followingCount">0</span> Following
+                                </div>
+                                <div>
+                                    <span id="followersCount">0</span> Followers
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- User's Tweets -->
+                    <div id="profileTweetsContainer">
+                        <div class="loading">Loading your posts...</div>
+                    </div>
+                </div>
+
+            </main>
+
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/frontend.js"></script>
+    
+</body>
+</html>
