@@ -1,9 +1,17 @@
 const { MongoClient } = require('mongodb');
+require('dotenv').config();
 
 // MongoDB Atlas connection URL and database name
-// Paste your MongoDB Atlas connection string below
-const url = 'mongodb+srv://jaynenjeri739_db_user:CyqSTILCYsJU72Ze@cluster0.uhikndc.mongodb.net/?appName=Cluster0';
-const dbName = 'socialNetworkDB';
+// Load from environment variables for security
+const url = process.env.MONGODB_URI;
+const dbName = process.env.DB_NAME || 'socialNetworkDB';
+
+if (!url) {
+  console.error('❌ MONGODB_URI not found in environment variables!');
+  console.error('Please create a .env file with your MongoDB Atlas connection string.');
+  console.error('See MONGODB-ATLAS-SETUP.md for instructions.');
+  process.exit(1);
+}
 
 let db = null;
 let client = null;
