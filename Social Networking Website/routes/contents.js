@@ -40,7 +40,8 @@ router.post('/', requireAuth, async (req, res) => {
       text: text || '',
       timestamp: new Date(),
       likes: [],
-      likesCount: 0
+      likesCount: 0,
+      commentCount: 0
     };
     
     // If image data is provided, store it as binary
@@ -121,15 +122,56 @@ router.get('/', async (req, res) => {
       .sort({ timestamp: -1 })
       .toArray();
     
-    // Fetch images for contents that have imageId
+    if (contents.length === 0) {
+      return res.json({ contents: [] });
+    }
+    
+    // Fetch images and author profile pictures for contents
     const imagesCollection = db.collection('images');
+    const usersCollection = db.collection('users');
+    
+    // Collect all unique author IDs
+    const authorIds = [...new Set(contents.map(c => c.authorId.toString()))];
+    
+    // Fetch all authors in one query
+    const authors = await usersCollection
+      .find(
+        { _id: { $in: authorIds.map(id => new ObjectId(id)) } },
+        { projection: { profilePictureUrl: 1 } }
+      )
+      .toArray();
+    
+    // Create a map for quick lookup
+    const authorMap = {};
+    authors.forEach(author => {
+      authorMap[author._id.toString()] = author.profilePictureUrl;
+    });
+    
+    // Get auth token once
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    const session = token ? req.sessions?.get(token) : null;
+    const currentUserId = session?.user?._id?.toString();
+    
+    // Process all contents
     for (let content of contents) {
+      // Fetch post image if exists
       if (content.imageId) {
         const image = await imagesCollection.findOne({ _id: content.imageId });
         if (image) {
           const base64Image = image.data.buffer.toString('base64');
           content.imageData = `data:${image.contentType};base64,${base64Image}`;
         }
+      }
+      
+      // Add author profile picture from map
+      const authorId = content.authorId.toString();
+      if (authorMap[authorId]) {
+        content.authorProfilePicture = authorMap[authorId];
+      }
+      
+      // Add isLiked status
+      if (currentUserId) {
+        content.isLiked = content.likes?.includes(currentUserId) || false;
       }
     }
     
@@ -179,15 +221,26 @@ router.post('/like', requireAuth, async (req, res) => {
       };
     }
     
-    await contentsCollection.updateOne(
+    const result = await contentsCollection.updateOne(
       { _id: new ObjectId(contentId) },
       update
     );
     
-    res.json({
+    // Get updated content to return new count
+    const updatedContent = await contentsCollection.findOne({ _id: new ObjectId(contentId) });
+    
+    console.log('Updated content:', updatedContent);
+    console.log('Likes count:', updatedContent.likesCount);
+    
+    const response = {
       message: hasLiked ? 'Post unliked' : 'Post liked',
-      liked: !hasLiked
-    });
+      liked: !hasLiked,
+      likesCount: updatedContent.likesCount || 0
+    };
+    
+    console.log('Sending response:', response);
+    
+    res.json(response);
   } catch (error) {
     console.error('Error liking content:', error);
     res.status(500).json({ error: 'Failed to like content' });

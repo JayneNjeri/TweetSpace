@@ -179,23 +179,22 @@
 
                 <!-- PROFILE VIEW -->
                 <div id="profileView" class="view hidden">
-                    <div class="content-header">
-                        <h2>Profile</h2>
-                    </div>
-                    
                     <!-- Profile Header -->
                     <div class="profile-header">
                         <div class="profile-banner"></div>
                         <div class="profile-info">
                             <div class="profile-avatar-large" id="profileAvatar">U</div>
+                            <button id="editProfileBtn" class="edit-profile-btn">
+                                <i class="fas fa-edit"></i> Edit Profile
+                            </button>
                             <div class="profile-name" id="profileName">Username</div>
                             <div class="profile-username" id="profileUsername">@username</div>
                             <div class="profile-bio" id="profileBio">No bio yet</div>
                             <div class="profile-stats">
-                                <div>
+                                <div class="stat-item" id="followingBtn" style="cursor: pointer;">
                                     <span id="followingCount">0</span> Following
                                 </div>
-                                <div>
+                                <div class="stat-item" id="followersBtn" style="cursor: pointer;">
                                     <span id="followersCount">0</span> Followers
                                 </div>
                             </div>
@@ -210,6 +209,96 @@
 
             </main>
 
+        </div>
+    </div>
+
+    <!-- Followers/Following Modal -->
+    <div id="followModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="followModalTitle">Followers</h3>
+                <button class="modal-close" onclick="closeFollowModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="followModalBody" class="modal-body">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div id="editProfileModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Profile</h3>
+                <button class="modal-close" onclick="closeEditProfileModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="editProfileAlert" class="alert hidden"></div>
+                <form id="editProfileForm">
+                    <div class="form-group">
+                        <div class="profile-picture-upload">
+                            <div class="current-profile-pic" id="currentProfilePic">
+                                <div class="profile-avatar-large" id="editProfileAvatar">U</div>
+                            </div>
+                            <div class="upload-controls">
+                                <input type="file" id="profilePictureInput" accept="image/*" style="display: none;">
+                                <button type="button" class="btn-secondary" onclick="document.getElementById('profilePictureInput').click()">Choose Photo</button>
+                                <button type="button" class="btn-secondary" id="removeProfilePicBtn" style="display: none;">Remove</button>
+                                <small>JPG, PNG or GIF (max 5MB)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editUsername">Username</label>
+                        <input type="text" id="editUsername" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editBio">Bio</label>
+                        <textarea id="editBio" class="form-control" rows="3" maxlength="160"></textarea>
+                        <small>Maximum 160 characters</small>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="closeEditProfileModal()">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Details Modal -->
+    <div id="userDetailsModal" class="modal hidden">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>User Profile</h3>
+                <button class="modal-close" onclick="closeUserDetailsModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="user-detail-header">
+                    <div class="profile-avatar-large" id="userDetailAvatar">U</div>
+                    <div class="profile-name" id="userDetailName">Username</div>
+                    <div class="profile-username" id="userDetailUsername">@username</div>
+                    <div class="profile-bio" id="userDetailBio">No bio yet</div>
+                    <div class="profile-stats">
+                        <div>
+                            <span id="userDetailFollowing">0</span> Following
+                        </div>
+                        <div>
+                            <span id="userDetailFollowers">0</span> Followers
+                        </div>
+                    </div>
+                </div>
+                <div class="user-detail-divider"></div>
+                <div id="userDetailPosts">
+                    <div class="loading">Loading posts...</div>
+                </div>
+            </div>
         </div>
     </div>
 

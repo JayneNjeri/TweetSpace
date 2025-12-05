@@ -64,6 +64,14 @@ function attachEventListeners() {
         e.preventDefault();
         showView('login');
     });
+    
+    // Profile followers/following
+    document.getElementById('followersBtn')?.addEventListener('click', () => showFollowersModal('followers'));
+    document.getElementById('followingBtn')?.addEventListener('click', () => showFollowersModal('following'));
+    
+    // Edit profile
+    document.getElementById('editProfileBtn')?.addEventListener('click', openEditProfileModal);
+    document.getElementById('editProfileForm')?.addEventListener('submit', handleEditProfile);
 }
 
 // ===== View Management =====
@@ -119,6 +127,12 @@ async function handleLogin(e) {
     
     const username = document.getElementById('loginUsername').value;
     const password = document.getElementById('loginPassword').value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.innerHTML;
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = 'Logging in<span class="spinner"></span>';
     
     try {
         const response = await fetch(`${API_BASE}/${STUDENT_ID}/login`, {
@@ -141,6 +155,9 @@ async function handleLogin(e) {
         }
     } catch (error) {
         showAlert('loginAlert', 'Network error. Please try again.', 'danger');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
     }
 }
 
@@ -151,6 +168,26 @@ async function handleRegister(e) {
     const email = document.getElementById('registerEmail').value;
     const password = document.getElementById('registerPassword').value;
     const bio = document.getElementById('registerBio').value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.innerHTML;
+    
+    // Client-side password validation
+    if (password.length < 6) {
+        showAlert('registerAlert', 'Password must be at least 6 characters long', 'danger');
+        return;
+    }
+    
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    
+    if (!hasLetter || !hasNumber) {
+        showAlert('registerAlert', 'Password must include both letters and numbers', 'danger');
+        return;
+    }
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = 'Creating account<span class="spinner"></span>';
     
     try {
         const response = await fetch(`${API_BASE}/${STUDENT_ID}/users`, {
@@ -169,6 +206,9 @@ async function handleRegister(e) {
         }
     } catch (error) {
         showAlert('registerAlert', 'Network error. Please try again.', 'danger');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
     }
 }
 
@@ -349,6 +389,21 @@ function displayTweets(tweets, container) {
     container.querySelectorAll('.action-btn[data-action="like"]').forEach(btn => {
         btn.addEventListener('click', () => handleLikeTweet(btn.dataset.tweetId));
     });
+    
+    // Attach comment button listeners
+    container.querySelectorAll('.action-btn[data-action="comment"]').forEach(btn => {
+        btn.addEventListener('click', () => toggleComments(btn.dataset.tweetId));
+    });
+    
+    // Attach comment form listeners
+    container.querySelectorAll('.comment-form').forEach(form => {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const tweetId = form.dataset.tweetId;
+            const input = form.querySelector('.comment-input');
+            handleAddComment(tweetId, input.value);
+        });
+    });
 }
 
 function createTweetCard(tweet) {
@@ -357,10 +412,15 @@ function createTweetCard(tweet) {
     const isLiked = tweet.isLiked ? 'liked' : '';
     const likeIcon = tweet.isLiked ? 'fas fa-heart' : 'far fa-heart';
     
+    // Use profile picture if available, otherwise show initials
+    const avatarContent = tweet.authorProfilePicture 
+        ? `<div class="tweet-avatar" style="background-image: url(${tweet.authorProfilePicture}); background-size: cover; background-position: center;"></div>`
+        : `<div class="tweet-avatar">${initials}</div>`;
+    
     return `
-        <div class="tweet-card">
+        <div class="tweet-card" data-tweet-id="${tweet._id}">
             <div class="tweet-content">
-                <div class="tweet-avatar">${initials}</div>
+                ${avatarContent}
                 <div class="tweet-body">
                     <div class="tweet-header">
                         <span class="tweet-author">${tweet.authorUsername}</span>
@@ -378,6 +438,19 @@ function createTweetCard(tweet) {
                             <i class="${likeIcon}"></i>
                             <span>${tweet.likesCount || 0}</span>
                         </button>
+                        <button class="action-btn" data-action="comment" data-tweet-id="${tweet._id}">
+                            <i class="far fa-comment"></i>
+                            <span>${tweet.commentCount || 0}</span>
+                        </button>
+                    </div>
+                    <div class="comments-section hidden" id="comments-${tweet._id}">
+                        <div class="comments-list">
+                            <div class="loading">Loading comments...</div>
+                        </div>
+                        <form class="comment-form" data-tweet-id="${tweet._id}">
+                            <input type="text" class="comment-input" placeholder="Write a comment..." required>
+                            <button type="submit" class="btn-comment">Post</button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -387,25 +460,27 @@ function createTweetCard(tweet) {
 
 async function handleLikeTweet(tweetId) {
     try {
-        // Find the button that was clicked
-        const button = document.querySelector(`[data-tweet-id="${tweetId}"]`);
-        if (!button) return;
-        
-        // Get current state
-        const isLiked = button.classList.contains('liked');
-        const countSpan = button.querySelector('span');
-        const currentCount = parseInt(countSpan.textContent) || 0;
-        
-        // Optimistically update UI immediately
-        if (isLiked) {
-            button.classList.remove('liked');
-            button.querySelector('i').className = 'far fa-heart';
-            countSpan.textContent = Math.max(0, currentCount - 1);
-        } else {
-            button.classList.add('liked');
-            button.querySelector('i').className = 'fas fa-heart';
-            countSpan.textContent = currentCount + 1;
+        // Find the like button specifically (not comment button)
+        const button = document.querySelector(`button[data-action="like"][data-tweet-id="${tweetId}"]`);
+        if (!button) {
+            console.error('Like button not found for tweet:', tweetId);
+            return;
         }
+        
+        // Get the span element
+        const countSpan = button.querySelector('span');
+        if (!countSpan) {
+            console.error('Count span not found in button');
+            return;
+        }
+        
+        const currentCount = parseInt(countSpan.textContent) || 0;
+        const isLiked = button.classList.contains('liked');
+        
+        console.log('Before like - Count:', currentCount, 'IsLiked:', isLiked, 'Span element:', countSpan);
+        
+        // Disable button while processing
+        button.disabled = true;
         
         // Send request to server
         const response = await fetch(`${API_BASE}/${STUDENT_ID}/contents/like`, {
@@ -417,21 +492,37 @@ async function handleLikeTweet(tweetId) {
             body: JSON.stringify({ contentId: tweetId })
         });
         
-        if (!response.ok) {
-            // If failed, revert the UI change
-            if (isLiked) {
+        const data = await response.json();
+        console.log('Server response:', data);
+        
+        if (response.ok) {
+            // Update heart icon and class
+            const icon = button.querySelector('i');
+            if (data.liked) {
                 button.classList.add('liked');
-                button.querySelector('i').className = 'fas fa-heart';
-                countSpan.textContent = currentCount;
+                if (icon) icon.className = 'fas fa-heart';
             } else {
                 button.classList.remove('liked');
-                button.querySelector('i').className = 'far fa-heart';
-                countSpan.textContent = currentCount;
+                if (icon) icon.className = 'far fa-heart';
             }
-            console.error('Failed to like post');
+            
+            // Update counter - force update
+            countSpan.innerText = data.likesCount;
+            countSpan.textContent = data.likesCount;
+            
+            console.log('After like - New count set to:', data.likesCount);
+            console.log('Span now shows:', countSpan.textContent);
+        } else {
+            console.error('Failed to like post:', data.error);
         }
+        
+        // Re-enable button
+        button.disabled = false;
     } catch (error) {
         console.error('Like error:', error);
+        // Re-enable button on error
+        const button = document.querySelector(`button[data-action="like"][data-tweet-id="${tweetId}"]`);
+        if (button) button.disabled = false;
     }
 }
 
@@ -559,8 +650,18 @@ async function loadUserProfile() {
     
     // Update profile header
     if (currentUser) {
-        const initials = currentUser.username.substring(0, 2).toUpperCase();
-        document.getElementById('profileAvatar').textContent = initials;
+        const profileAvatar = document.getElementById('profileAvatar');
+        if (currentUser.profilePictureUrl) {
+            profileAvatar.style.backgroundImage = `url(${currentUser.profilePictureUrl})`;
+            profileAvatar.style.backgroundSize = 'cover';
+            profileAvatar.style.backgroundPosition = 'center';
+            profileAvatar.textContent = '';
+        } else {
+            const initials = currentUser.username.substring(0, 2).toUpperCase();
+            profileAvatar.style.backgroundImage = 'none';
+            profileAvatar.textContent = initials;
+        }
+        
         document.getElementById('profileName').textContent = currentUser.username;
         document.getElementById('profileUsername').textContent = `@${currentUser.username}`;
         document.getElementById('profileBio').textContent = currentUser.bio || 'No bio yet';
@@ -625,3 +726,389 @@ function escapeHtml(text) {
 
 // Make removeImage globally accessible
 window.removeImage = removeImage;
+window.closeFollowModal = closeFollowModal;
+window.closeEditProfileModal = closeEditProfileModal;
+window.showUserDetailsModal = showUserDetailsModal;
+window.closeUserDetailsModal = closeUserDetailsModal;
+
+// ===== User Details Modal =====
+function showUserDetailsModal(userId, username, bio, followerCount, followingCount) {
+    const modal = document.getElementById('userDetailsModal');
+    const initials = username.substring(0, 2).toUpperCase();
+    
+    document.getElementById('userDetailAvatar').textContent = initials;
+    document.getElementById('userDetailName').textContent = username;
+    document.getElementById('userDetailUsername').textContent = `@${username}`;
+    document.getElementById('userDetailBio').textContent = bio;
+    document.getElementById('userDetailFollowers').textContent = followerCount;
+    document.getElementById('userDetailFollowing').textContent = followingCount;
+    
+    // Close the followers modal first
+    closeFollowModal();
+    
+    // Show user details modal
+    modal.classList.remove('hidden');
+    
+    // Load user's posts
+    loadUserPosts(userId);
+}
+
+function closeUserDetailsModal() {
+    document.getElementById('userDetailsModal').classList.add('hidden');
+}
+
+async function loadUserPosts(userId) {
+    const container = document.getElementById('userDetailPosts');
+    container.innerHTML = '<div class="loading">Loading posts...</div>';
+    
+    try {
+        const response = await fetch(`${API_BASE}/${STUDENT_ID}/contents?userId=${userId}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            if (data.contents && data.contents.length > 0) {
+                displayTweets(data.contents, container);
+            } else {
+                container.innerHTML = '<div class="empty-state">No posts yet</div>';
+            }
+        } else {
+            container.innerHTML = '<div class="empty-state">Failed to load posts</div>';
+        }
+    } catch (error) {
+        container.innerHTML = '<div class="empty-state">Network error</div>';
+    }
+}
+
+// ===== Comments System =====
+async function toggleComments(tweetId) {
+    const commentsSection = document.getElementById(`comments-${tweetId}`);
+    
+    if (commentsSection.classList.contains('hidden')) {
+        commentsSection.classList.remove('hidden');
+        await loadComments(tweetId);
+    } else {
+        commentsSection.classList.add('hidden');
+    }
+}
+
+async function loadComments(tweetId) {
+    const commentsList = document.querySelector(`#comments-${tweetId} .comments-list`);
+    commentsList.innerHTML = '<div class="loading">Loading comments...</div>';
+    
+    try {
+        const response = await fetch(`${API_BASE}/${STUDENT_ID}/comments/${tweetId}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            const comments = data.comments || [];
+            
+            if (comments.length === 0) {
+                commentsList.innerHTML = '<div class="no-comments">No comments yet. Be the first to comment!</div>';
+            } else {
+                commentsList.innerHTML = comments.map(comment => createCommentCard(comment)).join('');
+                
+                // Attach delete listeners for user's own comments
+                commentsList.querySelectorAll('.delete-comment-btn').forEach(btn => {
+                    btn.addEventListener('click', () => handleDeleteComment(btn.dataset.commentId, tweetId));
+                });
+            }
+        } else {
+            commentsList.innerHTML = '<div class="error-message">Failed to load comments</div>';
+        }
+    } catch (error) {
+        commentsList.innerHTML = '<div class="error-message">Network error</div>';
+    }
+}
+
+function createCommentCard(comment) {
+    const initials = comment.authorUsername.substring(0, 2).toUpperCase();
+    const timeAgo = formatTimeAgo(new Date(comment.timestamp));
+    const isOwnComment = currentUser && comment.authorId === currentUser._id;
+    
+    // Profile picture or initials
+    let avatarContent;
+    if (comment.authorProfilePicture) {
+        avatarContent = `<div class="comment-avatar" style="background-image: url('${comment.authorProfilePicture}'); background-size: cover; background-position: center;"></div>`;
+    } else {
+        avatarContent = `<div class="comment-avatar">${initials}</div>`;
+    }
+    
+    return `
+        <div class="comment-card">
+            ${avatarContent}
+            <div class="comment-body">
+                <div class="comment-header">
+                    <span class="comment-author">${escapeHtml(comment.authorUsername)}</span>
+                    <span class="comment-time">${timeAgo}</span>
+                    ${isOwnComment ? `
+                        <button class="delete-comment-btn" data-comment-id="${comment._id}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </div>
+                <div class="comment-text">${escapeHtml(comment.text)}</div>
+            </div>
+        </div>
+    `;
+}
+
+async function handleAddComment(tweetId, text) {
+    if (!text || text.trim().length === 0) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/${STUDENT_ID}/comments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ contentId: tweetId, text: text.trim() })
+        });
+        
+        if (response.ok) {
+            // Clear input
+            const form = document.querySelector(`form[data-tweet-id="${tweetId}"]`);
+            if (form) {
+                form.querySelector('.comment-input').value = '';
+            }
+            
+            // Update comment count
+            const commentBtn = document.querySelector(`button[data-action="comment"][data-tweet-id="${tweetId}"]`);
+            if (commentBtn) {
+                const countSpan = commentBtn.querySelector('span');
+                countSpan.textContent = parseInt(countSpan.textContent) + 1;
+            }
+            
+            // Reload comments
+            await loadComments(tweetId);
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to add comment');
+        }
+    } catch (error) {
+        alert('Network error. Please try again.');
+    }
+}
+
+async function handleDeleteComment(commentId, tweetId) {
+    if (!confirm('Delete this comment?')) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/${STUDENT_ID}/comments/${commentId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        if (response.ok) {
+            // Update comment count
+            const commentBtn = document.querySelector(`button[data-action="comment"][data-tweet-id="${tweetId}"]`);
+            if (commentBtn) {
+                const countSpan = commentBtn.querySelector('span');
+                countSpan.textContent = Math.max(0, parseInt(countSpan.textContent) - 1);
+            }
+            
+            // Reload comments
+            await loadComments(tweetId);
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to delete comment');
+        }
+    } catch (error) {
+        alert('Network error. Please try again.');
+    }
+}
+
+// ===== Followers/Following Modal =====
+async function showFollowersModal(type) {
+    const modal = document.getElementById('followModal');
+    const title = document.getElementById('followModalTitle');
+    const body = document.getElementById('followModalBody');
+    
+    title.textContent = type === 'followers' ? 'Followers' : 'Following';
+    body.innerHTML = '<div class="loading">Loading...</div>';
+    modal.classList.remove('hidden');
+    
+    try {
+        const response = await fetch(`${API_BASE}/${STUDENT_ID}/follow/${type}/${currentUser._id}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            const users = data[type] || [];
+            
+            if (users.length === 0) {
+                body.innerHTML = `<div class="empty-state">No ${type} yet</div>`;
+            } else {
+                body.innerHTML = users.map(user => `
+                    <div class="user-item clickable" data-user-id="${user._id}" onclick="showUserDetailsModal('${user._id}', '${escapeHtml(user.username)}', '${escapeHtml(user.bio || 'No bio')}', ${user.followerCount || 0}, ${user.followingCount || 0})">
+                        <div class="user-avatar">${user.username.substring(0, 2).toUpperCase()}</div>
+                        <div class="user-details">
+                            <div class="user-name">${escapeHtml(user.username)}</div>
+                            <div class="user-bio">${escapeHtml(user.bio || 'No bio')}</div>
+                            <div class="user-stats-small">
+                                ${user.followerCount || 0} followers · ${user.followingCount || 0} following
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } else {
+            body.innerHTML = '<div class="empty-state">Failed to load users</div>';
+        }
+    } catch (error) {
+        body.innerHTML = '<div class="empty-state">Network error</div>';
+    }
+}
+
+function closeFollowModal() {
+    document.getElementById('followModal').classList.add('hidden');
+}
+
+// ===== Edit Profile Modal =====
+let selectedProfilePicture = null;
+
+function openEditProfileModal() {
+    document.getElementById('editUsername').value = currentUser.username;
+    document.getElementById('editBio').value = currentUser.bio || '';
+    
+    // Display current profile picture or initials
+    const editAvatar = document.getElementById('editProfileAvatar');
+    if (currentUser.profilePictureUrl) {
+        editAvatar.style.backgroundImage = `url(${currentUser.profilePictureUrl})`;
+        editAvatar.style.backgroundSize = 'cover';
+        editAvatar.style.backgroundPosition = 'center';
+        editAvatar.textContent = '';
+        document.getElementById('removeProfilePicBtn').style.display = 'inline-block';
+    } else {
+        editAvatar.textContent = currentUser.username.substring(0, 2).toUpperCase();
+        editAvatar.style.backgroundImage = 'none';
+        document.getElementById('removeProfilePicBtn').style.display = 'none';
+    }
+    
+    selectedProfilePicture = null;
+    
+    // Setup profile picture input handler
+    const profilePicInput = document.getElementById('profilePictureInput');
+    profilePicInput.value = '';
+    profilePicInput.onchange = handleProfilePictureSelect;
+    
+    // Setup remove button
+    document.getElementById('removeProfilePicBtn').onclick = removeProfilePicture;
+    
+    document.getElementById('editProfileModal').classList.remove('hidden');
+}
+
+function handleProfilePictureSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        showAlert('editProfileAlert', 'Image size must be less than 5MB', 'danger');
+        return;
+    }
+    
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+        showAlert('editProfileAlert', 'Please select an image file', 'danger');
+        return;
+    }
+    
+    // Read and display the image
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        selectedProfilePicture = event.target.result;
+        const editAvatar = document.getElementById('editProfileAvatar');
+        editAvatar.style.backgroundImage = `url(${selectedProfilePicture})`;
+        editAvatar.style.backgroundSize = 'cover';
+        editAvatar.style.backgroundPosition = 'center';
+        editAvatar.textContent = '';
+        document.getElementById('removeProfilePicBtn').style.display = 'inline-block';
+    };
+    reader.readAsDataURL(file);
+}
+
+function removeProfilePicture() {
+    selectedProfilePicture = '';
+    const editAvatar = document.getElementById('editProfileAvatar');
+    editAvatar.style.backgroundImage = 'none';
+    editAvatar.textContent = currentUser.username.substring(0, 2).toUpperCase();
+    document.getElementById('removeProfilePicBtn').style.display = 'none';
+    document.getElementById('profilePictureInput').value = '';
+}
+
+function closeEditProfileModal() {
+    document.getElementById('editProfileModal').classList.add('hidden');
+}
+
+async function handleEditProfile(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('editUsername').value.trim();
+    const bio = document.getElementById('editBio').value.trim();
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.innerHTML;
+    
+    if (!username) {
+        showAlert('editProfileAlert', 'Username cannot be empty', 'danger');
+        return;
+    }
+    
+    const requestData = { username, bio };
+    
+    // Include profile picture if changed
+    if (selectedProfilePicture !== null) {
+        requestData.profilePicture = selectedProfilePicture;
+    }
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = 'Saving<span class="spinner"></span>';
+    
+    try {
+        const response = await fetch(`${API_BASE}/${STUDENT_ID}/users/${currentUser._id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Update currentUser immediately with new values
+            currentUser.username = username;
+            currentUser.bio = bio;
+            if (selectedProfilePicture !== null) {
+                currentUser.profilePictureUrl = selectedProfilePicture;
+            }
+            
+            // Also fetch fresh data from server to get follower counts etc
+            const userResponse = await fetch(`${API_BASE}/${STUDENT_ID}/users?userId=${currentUser._id}`);
+            const userData = await userResponse.json();
+            
+            if (userResponse.ok && userData.users && userData.users.length > 0) {
+                const updatedUser = userData.users.find(u => u._id === currentUser._id);
+                if (updatedUser) {
+                    Object.assign(currentUser, updatedUser);
+                }
+            }
+            
+            showAlert('editProfileAlert', 'Profile updated successfully!', 'success');
+            setTimeout(() => {
+                closeEditProfileModal();
+                loadUserProfile();
+            }, 1000);
+        } else {
+            showAlert('editProfileAlert', data.error || 'Failed to update profile', 'danger');
+        }
+    } catch (error) {
+        showAlert('editProfileAlert', 'Network error. Please try again.', 'danger');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
+    }
+}

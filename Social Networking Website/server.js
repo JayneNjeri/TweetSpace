@@ -6,6 +6,7 @@ const loginRoutes = require('./routes/login');
 const contentRoutes = require('./routes/contents');
 const followRoutes = require('./routes/follow');
 const feedRoutes = require('./routes/feed');
+const commentRoutes = require('./routes/comments');
 
 const app = express();
 const PORT = 3000;
@@ -32,6 +33,7 @@ app.use(`/${STUDENT_ID}/login`, loginRoutes);
 app.use(`/${STUDENT_ID}/contents`, contentRoutes);
 app.use(`/${STUDENT_ID}/follow`, followRoutes);
 app.use(`/${STUDENT_ID}/feed`, feedRoutes);
+app.use(`/${STUDENT_ID}/comments`, commentRoutes);
 
 // Root route
 app.get('/', (req, res) => {

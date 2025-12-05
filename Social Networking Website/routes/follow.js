@@ -140,4 +140,60 @@ router.delete('/', requireAuth, async (req, res) => {
   }
 });
 
+// GET /follow/followers/:userId - Get list of followers for a user
+router.get('/followers/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const db = getDB();
+    const followsCollection = db.collection('follows');
+    const usersCollection = db.collection('users');
+    
+    // Find all follow relationships where this user is being followed
+    const follows = await followsCollection
+      .find({ followingId: new ObjectId(userId) })
+      .toArray();
+    
+    // Get follower user details
+    const followerIds = follows.map(f => f.followerId);
+    const followers = await usersCollection
+      .find({ _id: { $in: followerIds } })
+      .project({ username: 1, bio: 1, followerCount: 1, followingCount: 1 })
+      .toArray();
+    
+    res.json({ followers });
+  } catch (error) {
+    console.error('Error fetching followers:', error);
+    res.status(500).json({ error: 'Failed to fetch followers' });
+  }
+});
+
+// GET /follow/following/:userId - Get list of users that a user is following
+router.get('/following/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const db = getDB();
+    const followsCollection = db.collection('follows');
+    const usersCollection = db.collection('users');
+    
+    // Find all follow relationships where this user is the follower
+    const follows = await followsCollection
+      .find({ followerId: new ObjectId(userId) })
+      .toArray();
+    
+    // Get following user details
+    const followingIds = follows.map(f => f.followingId);
+    const following = await usersCollection
+      .find({ _id: { $in: followingIds } })
+      .project({ username: 1, bio: 1, followerCount: 1, followingCount: 1 })
+      .toArray();
+    
+    res.json({ following });
+  } catch (error) {
+    console.error('Error fetching following:', error);
+    res.status(500).json({ error: 'Failed to fetch following' });
+  }
+});
+
 module.exports = router;

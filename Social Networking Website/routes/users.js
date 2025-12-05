@@ -13,6 +13,18 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Username, email, and password are required' });
     }
     
+    // Password validation: minimum 6 characters, at least one letter and one number
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+    
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    
+    if (!hasLetter || !hasNumber) {
+      return res.status(400).json({ error: 'Password must include both letters and numbers' });
+    }
+    
     const db = getDB();
     const usersCollection = db.collection('users');
     
@@ -99,6 +111,57 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// PUT /users/:id - Update user profile
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { username, bio, profilePicture } = req.body;
+    
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+    
+    const db = getDB();
+    const usersCollection = db.collection('users');
+    
+    // Check if new username is already taken by another user
+    const existingUser = await usersCollection.findOne({
+      username,
+      _id: { $ne: new ObjectId(id) }
+    });
+    
+    if (existingUser) {
+      return res.status(409).json({ error: 'Username already taken' });
+    }
+    
+    // Prepare update object
+    const updateData = { username, bio: bio || '' };
+    
+    // Handle profile picture if provided
+    if (profilePicture) {
+      if (profilePicture.startsWith('data:image')) {
+        // Store base64 image directly
+        updateData.profilePictureUrl = profilePicture;
+      }
+    }
+    
+    // Update user
+    const result = await usersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ message: 'Profile updated successfully' });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 

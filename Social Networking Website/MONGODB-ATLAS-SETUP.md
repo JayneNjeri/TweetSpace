@@ -190,5 +190,3 @@ mongodump --uri="mongodb+srv://socialnetwork:Pass123@cluster0.abc12.mongodb.net/
 - Connection Troubleshooting: https://docs.atlas.mongodb.com/troubleshoot-connection/
 
 ---
-
-**Ready? Set up your Atlas cluster, update the connection string, and start your server!** 🚀

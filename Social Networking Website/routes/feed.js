@@ -50,15 +50,46 @@ router.get('/', requireAuth, async (req, res) => {
       .sort({ timestamp: -1 })
       .toArray();
     
-    // Fetch images for contents that have imageId
+    if (feedContents.length === 0) {
+      return res.json({ feed: [], count: 0 });
+    }
+    
+    // Fetch images and author profile pictures for contents
     const imagesCollection = db.collection('images');
+    const usersCollection = db.collection('users');
+    
+    // Collect all unique author IDs
+    const authorIds = [...new Set(feedContents.map(c => c.authorId.toString()))];
+    
+    // Fetch all authors in one query
+    const authors = await usersCollection
+      .find(
+        { _id: { $in: authorIds.map(id => new ObjectId(id)) } },
+        { projection: { profilePictureUrl: 1 } }
+      )
+      .toArray();
+    
+    // Create a map for quick lookup
+    const authorMap = {};
+    authors.forEach(author => {
+      authorMap[author._id.toString()] = author.profilePictureUrl;
+    });
+    
+    // Process all contents
     for (let content of feedContents) {
+      // Fetch post image if exists
       if (content.imageId) {
         const image = await imagesCollection.findOne({ _id: content.imageId });
         if (image) {
           const base64Image = image.data.buffer.toString('base64');
           content.imageData = `data:${image.contentType};base64,${base64Image}`;
         }
+      }
+      
+      // Add author profile picture from map
+      const authorId = content.authorId.toString();
+      if (authorMap[authorId]) {
+        content.authorProfilePicture = authorMap[authorId];
       }
       
       // Check if current user has liked this post
