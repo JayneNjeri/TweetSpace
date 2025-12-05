@@ -261,8 +261,32 @@ function updateUserInfo() {
         
         const initials = currentUser.username.substring(0, 2).toUpperCase();
         
-        if (avatar) avatar.textContent = initials;
-        if (composerAvatar) composerAvatar.textContent = initials;
+        // Update top nav avatar
+        if (avatar) {
+            if (currentUser.profilePictureUrl) {
+                avatar.style.backgroundImage = `url(${currentUser.profilePictureUrl})`;
+                avatar.style.backgroundSize = 'cover';
+                avatar.style.backgroundPosition = 'center';
+                avatar.textContent = '';
+            } else {
+                avatar.style.backgroundImage = 'none';
+                avatar.textContent = initials;
+            }
+        }
+        
+        // Update composer avatar
+        if (composerAvatar) {
+            if (currentUser.profilePictureUrl) {
+                composerAvatar.style.backgroundImage = `url(${currentUser.profilePictureUrl})`;
+                composerAvatar.style.backgroundSize = 'cover';
+                composerAvatar.style.backgroundPosition = 'center';
+                composerAvatar.textContent = '';
+            } else {
+                composerAvatar.style.backgroundImage = 'none';
+                composerAvatar.textContent = initials;
+            }
+        }
+        
         if (name) name.textContent = currentUser.username;
         if (username) username.textContent = `@${currentUser.username}`;
     }
@@ -972,6 +996,13 @@ function openEditProfileModal() {
     document.getElementById('editUsername').value = currentUser.username;
     document.getElementById('editBio').value = currentUser.bio || '';
     
+    // Reset submit button state
+    const submitBtn = document.querySelector('#editProfileForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Save Changes';
+    }
+    
     // Display current profile picture or initials
     const editAvatar = document.getElementById('editProfileAvatar');
     if (currentUser.profilePictureUrl) {
@@ -1050,6 +1081,11 @@ async function handleEditProfile(e) {
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalBtnText = submitBtn.innerHTML;
     
+    // Prevent double submission
+    if (submitBtn.disabled) {
+        return;
+    }
+    
     if (!username) {
         showAlert('editProfileAlert', 'Username cannot be empty', 'danger');
         return;
@@ -1097,6 +1133,9 @@ async function handleEditProfile(e) {
                 }
             }
             
+            // Update UI with new profile picture
+            updateUserInfo();
+            
             showAlert('editProfileAlert', 'Profile updated successfully!', 'success');
             setTimeout(() => {
                 closeEditProfileModal();
@@ -1104,10 +1143,11 @@ async function handleEditProfile(e) {
             }, 1000);
         } else {
             showAlert('editProfileAlert', data.error || 'Failed to update profile', 'danger');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
         }
     } catch (error) {
         showAlert('editProfileAlert', 'Network error. Please try again.', 'danger');
-    } finally {
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalBtnText;
     }
